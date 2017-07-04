@@ -2,9 +2,9 @@
 
 **原文链接：** [MMeTokenDecrypt](https://github.com/manwhoami/MMeTokenDecrypt)
 
-**作者：**manwhoami
+**作者： ** manwhoami
 
-**翻译：**Chensh
+**翻译：**  Chensh
 
 
 
@@ -22,7 +22,7 @@
 
 ## 意义
 
-目前市面上的软件拥有类似功能的有一款名为**“Elcomsoft Phone Breaker”**[^注3]的取证工具。MMeTokenDecrypt是开源的，允许开发者包含这个解密iCloud授权的文件到他们的工程里。
+目前市面上的软件拥有类似功能的有一款名为“**Elcomsoft Phone Breaker**[^注3]”的取证工具。MMeTokenDecrypt是开源的，允许开发者包含这个解密iCloud授权的文件到他们的工程里。
 
 苹果必须要重新设计钥匙串信息。因为本程序fork了一个苹果已经签名的二进制文件作为子进程，当用户看到钥匙串访问请求弹窗时，并没有意识到背后的危险。更进一步，攻击者可以重复弹出钥匙串弹窗给用户，直至用户允许了钥匙串访问为止，因为苹果并没有为拒绝选项设定一个超时。这将会使得iCloud授权令牌被盗窃，而这些令牌可以用来访问几乎所有iCloud的服务项目：**iOS备份，iCloud联系人，iCloud Drive， iCloud 图片库， 查找我的好友，查找我的手机（查看我其他的项目）**。
 
