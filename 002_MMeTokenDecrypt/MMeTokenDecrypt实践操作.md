@@ -30,3 +30,36 @@
 
 
 
+## keyChain的不安全性
+
+本来keychain作为用户存储密码的载体，应该是做到很安全的，但这里有一个原文作者认为的bug，恶意用户可以根据这个bug来绕过钥匙串密码从而拿到keychain里面存储的条目。当然，这个绕过方式是有条件的，以下分别介绍两种情况。
+
+#### 当用户没有设防
+
+我们首先打开keychain应用(Spotlight里面输入Keychain Access进行搜索)。
+
+然后在左侧**种类**栏目**密码**一项进行选中，右侧就会出现存储在本机上的所有安全信息存储。这里进行筛选，找到我们的试验目标：**Chrome Safe Storage**。这个条目存储了谷歌Chrome浏览器的安全存储信息解密密钥。
+
+![](https://ws1.sinaimg.cn/large/006tKfTcgy1fhb0jtvyiqj31kw087400.jpg)
+
+那要如何拿到这个解密密钥呢？上文我们已经提及到了，这里打开命令行。输入以下命令：
+
+```Shell
+$ security find-generic-password -ga 'Chrome'
+```
+
+这里使用到了 security命令，它是非常强大命令行安全工具，之前我们[重签](http://chensh.top/2017/06/30/Patching-and-ReSigning-iOS-Apps/)的那篇文章里面也使用到了这个命令去查找有效的证书。
+
+这里的参数解释如下：
+
+* **find-generic-password** 命令参数，是使用“查找密码”的功能。
+* **-a**，这个参数是匹配之后提供的账户，用于过滤。
+* **-g**，这个参数是将查询到的密码显示出来。
+
+运行这个命令后，系统马上就会弹出一个提示框，如下：
+
+![](https://ws2.sinaimg.cn/large/006tKfTcgy1fhb0zu1parj30ok0badhp.jpg)
+
+
+
+#### 当用户开启了“询问钥匙串密码”选项
